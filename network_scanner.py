@@ -252,10 +252,15 @@ class SafeNetworkMonitor:
             else:
                 node_colors.append('blue')   # Other devices
         nx.draw(G_copy, pos,
-                with_labels=True,
+                #with_labels=True,
                 node_color=node_colors,
                 node_size=500,
                 font_size=8)
+        
+        label_pos = {node: (x, y - 0.08) for node, (x, y) in pos.items()}
+        nx.draw_networkx_labels(G_copy, label_pos, font_size=8)
+
+       
         plt.title("Network Map")
         # Save to buffer
         img = io.BytesIO()
