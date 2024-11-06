@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ title }}</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            background: #fff; 
+            padding: 20px; 
+            box-shadow: 0 0 10px rgba(0,0,0,0.1); 
+        }
+        header {
+            background: #333;
+            color: #fff;
+            padding: 20px 0;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        h1 { 
+            margin: 0;
+        }
+        .graph-container { 
+            margin: 20px 0; 
+            text-align: center;
+        }
+        .device-list { 
+            margin: 20px 0; 
+        }
+        .graph-image { 
+            max-width: 100%; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 20px; 
+        }
+        th, td { 
+            padding: 12px; 
+            border: 1px solid #ddd; 
+            text-align: left; 
+        }
+        th { 
+            background-color: #f2f2f2; 
+        }
+        #statusInfo { 
+            font-size: 1.2em; 
+            margin-bottom: 20px; 
+        }
+        h2 { 
+            color: #333; 
+            border-bottom: 2px solid #f2f2f2;
+            padding-bottom: 10px;
+            margin-top: 40px;
+        }
+        /* Modal Styles */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; 
+            z-index: 1000; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgba(0,0,0,0.5); /* Black with opacity */
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto; /* 10% from the top and centered */
+            padding: 20px;
+            border: 1px solid #888;
+            width: 90%; 
+            max-width: 800px;
+            border-radius: 8px;
+            position: relative;
+        }
+        .close {
+            color: #aaa;
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+        }
+        .alert-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .alert-table th, .alert-table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        .alert-table th {
+            background-color: #f9f9f9;
+        }
+        .alert-button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+        .alert-button:hover {
+            background-color: #0056b3;
+        }
+        .alert-button:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.5);
+        }
+        /* Responsive Table */
+        @media screen and (max-width: 600px) {
+            .alert-table th, .alert-table td {
+                padding: 8px;
+            }
+            .alert-button {
+                padding: 4px 8px;
+                font-size: 0.9em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Network Scanner</h1>
+    </header>
+    <div class="container">
+        <div class="graph-container">
+            <h2>Devices in Network</h2>
+            <img src="/graph.png" class="graph-image" id="graph" alt="Network Graph">
+        </div>
+        <div class="device-list" id="deviceList">
+            <h2>Status</h2>
+            <div id="statusInfo"></div>
+            <h2>Connected Devices</h2>
+            <table id="deviceTable">
+                <thead>
+                    <tr>
+                        <th>IP Address</th>
+                        <th>MAC Address</th>
+                        <th>Last Seen</th>
+                        <th>Status</th>
+                        <th>Alerts</th> <!-- Alerts Column -->
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Device data will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal Structure -->
+    <div id="alertsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Alerts for <span id="modalDeviceIP"></span></h2>
+            <table class="alert-table" id="modalAlertTable">
+                <thead>
+                    <tr>
+                        <th>Event</th>
+                        <th>Details</th>
+                        <th>Timestamp</th>
+                        <th>Event ID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Alert data will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Add the formatBytes function
+        function formatBytes(bytes) {
+            if (bytes === 0 || isNaN(bytes)) return '0 B';
+            const k = 1024;
+            const dm = 2; // Decimal places
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        // Global variables to store alerts
+        let allAlerts = [];
+        let alertsByDevice = {};
+
+        function updateData() {
+            // Update status
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('statusInfo').textContent = data.status;
+                });
+                
+            // Fetch and process alerts
+            fetch('/alerts')
+                .then(response => response.json())
+                .then(data => {
+                    allAlerts = data;
+                    // Group alerts by source IP
+                    alertsByDevice = {};
+                    allAlerts.forEach(alert => {
+                        const source = alert.source;
+                        if (!alertsByDevice[source]) {
+                            alertsByDevice[source] = [];
+                        }
+                        alertsByDevice[source].push(alert);
+                    });
+                })
+                .catch(error => console.error('Error fetching alerts:', error));
+
+            // Update device list
+            fetch('/devices')
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.querySelector('#deviceTable tbody');
+                    tbody.innerHTML = ''; // Clear existing data
+                    for (let ip in data) {
+                        const device = data[ip];
+                        const row = document.createElement('tr');
+                        
+                        const ipCell = document.createElement('td');
+                        ipCell.textContent = ip;
+                        row.appendChild(ipCell);
+                        
+                        const macCell = document.createElement('td');
+                        macCell.textContent = device.mac;
+                        row.appendChild(macCell);
+                        
+                        const lastSeenCell = document.createElement('td');
+                        const date = new Date(device.last_seen * 1000);
+                        lastSeenCell.textContent = date.toLocaleString();
+                        row.appendChild(lastSeenCell);
+
+                        const statusCell = document.createElement('td');
+                        statusCell.innerHTML = device.monitored 
+                            ? "<span style='color:green'>Client connected</span>" 
+                            : "<span style='color:orange'>Unmonitored</span>";
+                        row.appendChild(statusCell);
+
+                        const alertsCell = document.createElement('td');
+                        const alertCount = alertsByDevice[ip] ? alertsByDevice[ip].length : 0;
+                        if (alertCount > 0) {
+                            const alertButton = document.createElement('button');
+                            alertButton.textContent = alertCount + ' Alert' + (alertCount > 1 ? 's' : '');
+                            alertButton.className = 'alert-button';
+                            alertButton.addEventListener('click', () => openModal(ip));
+                            alertsCell.appendChild(alertButton);
+                        } else {
+                            alertsCell.textContent = '0';
+                        }
+                        row.appendChild(alertsCell);
+
+                        tbody.appendChild(row);
+                    }
+                });
+            
+            // Update graph
+            document.getElementById('graph').src = '/graph.png?' + new Date().getTime();
+        }
+
+        // Modal handling
+        const modal = document.getElementById('alertsModal');
+        const modalClose = document.getElementsByClassName('close')[0];
+        const modalDeviceIP = document.getElementById('modalDeviceIP');
+        const modalAlertTableBody = document.querySelector('#modalAlertTable tbody');
+
+        function openModal(ip) {
+            modalDeviceIP.textContent = ip;
+            // Clear previous alerts
+            modalAlertTableBody.innerHTML = '';
+            if (alertsByDevice[ip] && alertsByDevice[ip].length > 0) {
+                // Sort alerts by timestamp descending
+                const sortedAlerts = alertsByDevice[ip].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                sortedAlerts.forEach(alert => {
+                    const row = document.createElement('tr');
+
+                    const messageCell = document.createElement('td');
+                    messageCell.textContent = alert.message;
+                    row.appendChild(messageCell);
+
+                    const detailsCell = document.createElement('td');
+                    detailsCell.textContent = alert.details;
+                    row.appendChild(detailsCell);
+
+                    const timestampCell = document.createElement('td');
+                    const alertDate = new Date(alert.timestamp);
+                    timestampCell.textContent = alertDate.toLocaleString();
+                    row.appendChild(timestampCell);
+
+                    const eventIdCell = document.createElement('td');
+                    eventIdCell.textContent = alert.event_id;
+                    row.appendChild(eventIdCell);
+
+                    modalAlertTableBody.appendChild(row);
+                });
+            } else {
+                const noAlertsRow = document.createElement('tr');
+                const noAlertsCell = document.createElement('td');
+                noAlertsCell.colSpan = 4;
+                noAlertsCell.textContent = 'No alerts for this device.';
+                noAlertsCell.style.textAlign = 'center';
+                noAlertsRow.appendChild(noAlertsCell);
+                modalAlertTableBody.appendChild(noAlertsRow);
+            }
+            modal.style.display = 'block';
+        }
+
+        // When the user clicks on <span> (x), close the modal
+        modalClose.onclick = function() {
+            modal.style.display = 'none';
+        }
+
+        // When the user clicks anywhere outside of the modal, close it
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Update every 10 seconds
+        setInterval(updateData, 10000);
+        updateData();  // Initial update
+
+    </script>
+</body>
+</html>
