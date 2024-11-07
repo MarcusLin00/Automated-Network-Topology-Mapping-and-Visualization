@@ -136,6 +136,26 @@
                 font-size: 0.9em;
             }
         }
+        .resolved-button {
+            background-color: #007BFF; /* Green */
+            color: white;
+            border: none;
+            padding: 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.3s ease;
+        }
+
+        .resolved-button:hover {
+            background-color: #0056b3;
+        }
+
+        .resolved-button:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.5);
+        }
+
     </style>
 </head>
 <body>
@@ -180,6 +200,7 @@
                         <th>Details</th>
                         <th>Timestamp</th>
                         <th>Event ID</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -312,18 +333,55 @@
                     eventIdCell.textContent = alert.event_id;
                     row.appendChild(eventIdCell);
 
+                    // Actions Cell with Resolved Button
+                    const actionsCell = document.createElement('td');
+                    const resolvedButton = document.createElement('button');
+                    resolvedButton.textContent = 'Resolved';
+                    resolvedButton.className = 'alert-button resolved-button';
+                    resolvedButton.dataset.eventId = alert.event_id; // Store event_id for reference
+                    resolvedButton.addEventListener('click', () => resolveAlert(alert.event_id, row));
+                    actionsCell.appendChild(resolvedButton);
+                    row.appendChild(actionsCell);
+
                     modalAlertTableBody.appendChild(row);
                 });
             } else {
                 const noAlertsRow = document.createElement('tr');
                 const noAlertsCell = document.createElement('td');
-                noAlertsCell.colSpan = 4;
+                noAlertsCell.colSpan = 5; // Updated to span 5 columns
                 noAlertsCell.textContent = 'No alerts for this device.';
                 noAlertsCell.style.textAlign = 'center';
                 noAlertsRow.appendChild(noAlertsCell);
                 modalAlertTableBody.appendChild(noAlertsRow);
             }
             modal.style.display = 'block';
+        }
+
+        function resolveAlert(eventId, row) {
+            // Send POST request to resolve the alert
+            fetch('/resolve_alert', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ event_id: eventId })
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Show "Event resolved" message in the row
+                    row.innerHTML = '<td colspan="5" style="text-align: center; color: green;">Event resolved</td>';
+                    // After 5 seconds, remove the row
+                    setTimeout(() => {
+                        row.remove();
+                    }, 5000);
+                } else {
+                    return response.json().then(data => { throw new Error(data.error); });
+                }
+            })
+            .catch(error => {
+                console.error('Error resolving alert:', error);
+                alert('Failed to resolve alert. Please try again.');
+            });
         }
 
         // When the user clicks on <span> (x), close the modal

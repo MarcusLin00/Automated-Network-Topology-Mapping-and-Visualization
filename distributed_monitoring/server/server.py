@@ -9,7 +9,7 @@ import threading
 import time
 import signal
 
-from flask import Flask, render_template, Response, jsonify
+from flask import Flask, render_template, Response, jsonify, request
 from datetime import datetime
 import matplotlib
 matplotlib.use('Agg')
@@ -19,6 +19,7 @@ import networkx as nx
 import nmap
 from collections import defaultdict
 from werkzeug.serving import make_server
+from encryption_utils import verify_and_decrypt_message, load_aes_key, derive_keys
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
@@ -34,6 +35,10 @@ alerts_lock = threading.Lock()
 # SSL context for secure TCP server
 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 ssl_context.load_cert_chain(certfile="server.crt", keyfile="server.key")
+
+# AES and HMAC Keys
+original_aes_key = load_aes_key("aes_key.pem", "cs204")
+aes_key, hmac_key = derive_keys(original_aes_key)
 
 
 class SafeNetworkMonitor:
@@ -225,6 +230,25 @@ def get_alerts():
     with alerts_lock:
         return jsonify(alerts)
 
+@app.route("/resolve_alert", methods=['POST'])
+def resolve_alert():
+    """Handle resolving an alert by removing it from the alerts list."""
+    data = request.get_json()
+    if not data or 'event_id' not in data:
+        return jsonify({'error': 'Invalid request. event_id is required.'}), 400
+    
+    event_id = data['event_id']
+    
+    with alerts_lock:
+        # Find the alert with the given event_id
+        for alert in alerts:
+            if alert['event_id'] == event_id:
+                alerts.remove(alert)
+                logging.info(f"Resolved alert with event_id: {event_id}")
+                return jsonify({'message': 'Alert resolved successfully.'}), 200
+    
+    # If alert with event_id not found
+    return jsonify({'error': 'Alert not found.'}), 404
 
 # Flask server running in a separate thread with control for shutdown
 class FlaskServerThread(threading.Thread):
@@ -274,12 +298,17 @@ async def udp_server(shutdown_event, cleanup_interval=1, stale_threshold=10):
             # Wait for data or until it's time to cleanup
             timeout = max(time_until_cleanup, 0.1)  # Ensure a minimal timeout
             data, addr = await asyncio.wait_for(loop.sock_recvfrom(udp_socket, 1024), timeout=timeout)
-            logging.info(f"Received from {addr[0]}: {data.decode('utf-8')}")
-            with client_statuses_lock:
-                client_statuses[addr[0]] = {
-                    'data': data.decode("utf-8"),
-                    'last_seen': time.time()
-                }
+            try:
+                message = verify_and_decrypt_message(data, aes_key, hmac_key)
+                logging.info(f"Received from {addr[0]}: {message.decode('utf-8')}")
+                with client_statuses_lock:
+                    client_statuses[addr[0]] = {
+                        'data': message.decode("utf-8"),
+                        'last_seen': time.time()
+                    }
+            except ValueError as e:
+                print("Message authentication failed:", e)
+            
         except asyncio.TimeoutError:
             # Timeout reached, loop will perform cleanup if necessary
             continue
