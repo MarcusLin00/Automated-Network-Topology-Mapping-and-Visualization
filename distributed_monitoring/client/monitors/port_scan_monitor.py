@@ -70,11 +70,12 @@ class PortScanMonitor(BaseMonitor):
                     # Check if an alert was recently sent for this IP
                     last_alert_time = self.alerted_ips.get(src_ip, 0)
                     if current_time - last_alert_time >= self.cooldown:
+                        event_name = "Port scan detected"
                         alert_message = f"Port scan detected from IP {src_ip} at {datetime.now().isoformat()}"
                         logging.warning(alert_message)
                         # Schedule the alert coroutine on the provided event loop
                         asyncio.run_coroutine_threadsafe(
-                            self.alert_callback(alert_message, self._generate_event_id(host_ip)),
+                            self.alert_callback(event_name, alert_message, self._generate_event_id(host_ip)),
                             self.loop
                         )
                         # Update the last alert time

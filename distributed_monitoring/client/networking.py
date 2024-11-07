@@ -11,7 +11,7 @@ from ssl_context import create_ssl_context
 # Initialize SSL context
 SSL_CONTEXT = create_ssl_context()
 
-async def send_alert(alert_message: str, event_id: str):
+async def send_alert(event_name, alert_message: str, event_id: str):
     """Send alerts to the server via TCP with TLS."""
     try:
         logging.debug(f"Attempting to send alert {event_id}: {alert_message}")
@@ -23,7 +23,7 @@ async def send_alert(alert_message: str, event_id: str):
 
         # Prepare the alert data
         alert_data = {
-            "message": "Port scan detected",
+            "event_name": event_name,
             "details": alert_message,
             "timestamp": datetime.now().isoformat(),
             "event_id": event_id
