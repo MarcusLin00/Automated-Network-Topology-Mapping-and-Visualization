@@ -40,6 +40,7 @@ class PortScanMonitor(BaseMonitor):
 
     def detect(self, packet):
         if packet.haslayer(IP) and packet.haslayer(TCP):
+            host_ip = packet[IP].dst
             src_ip = packet[IP].src
             tcp_layer = packet[TCP]
             flags = tcp_layer.flags
@@ -73,7 +74,7 @@ class PortScanMonitor(BaseMonitor):
                         logging.warning(alert_message)
                         # Schedule the alert coroutine on the provided event loop
                         asyncio.run_coroutine_threadsafe(
-                            self.alert_callback(alert_message, self._generate_event_id(src_ip)),
+                            self.alert_callback(alert_message, self._generate_event_id(host_ip)),
                             self.loop
                         )
                         # Update the last alert time
