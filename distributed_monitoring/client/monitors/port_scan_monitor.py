@@ -14,7 +14,7 @@ class PortScanMonitor(BaseMonitor):
 
     def __init__(
         self,
-        alert_callback: Callable[[str, str], asyncio.Future],
+        alert_callback: Callable[[str, str, str], asyncio.Future],
         loop: asyncio.AbstractEventLoop,
         threshold: int = 10,
         time_window: int = 10,

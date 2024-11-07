@@ -305,7 +305,7 @@ async def handle_alert(reader, writer):
             alerts.append({
                 'timestamp': datetime.now().isoformat(),
                 'source': addr[0],
-                'message': alertObject['message'],
+                'event_name': alertObject['event_name'],
                 'details': alertObject['details'],
                 'event_id': alertObject['event_id']
             })

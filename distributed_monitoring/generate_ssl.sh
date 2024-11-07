@@ -78,3 +78,27 @@ openssl x509 -req -in server.csr -signkey server.key -out server.crt -days 365 -
 # Verification step
 echo "Generated certificate for IP: $CURRENT_IP"
 openssl x509 -in server.crt -text -noout | grep -A1 "Subject Alternative Name"
+
+# Define paths to /server and /client directories
+SERVER_DIR="./server"
+CLIENT_DIR="./client"
+
+# Copy the generated certificate and key to /server
+if [[ -d "$SERVER_DIR" ]]; then
+  cp server.crt "$SERVER_DIR/server.crt"
+  cp server.key "$SERVER_DIR/server.key"
+  echo "Copied server.crt and server.key to /server directory."
+else
+  echo "/server directory not found."
+fi
+
+# Copy the generated certificate to /client
+if [[ -d "$CLIENT_DIR" ]]; then
+  cp server.crt "$CLIENT_DIR/server.crt"
+  echo "Copied server.crt to /client directory."
+else
+  echo "/client directory not found."
+fi
+
+# Cleanup
+rm -f server.csr openssl.cnf

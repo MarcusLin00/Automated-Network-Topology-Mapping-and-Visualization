@@ -55,9 +55,9 @@ class ClientManager:
         """Start the status update sender."""
         send_status(self.shutdown_event, self.status_interval)
 
-    async def send_alert_async(self, alert_message: str, event_id: str):
+    async def send_alert_async(self, event_name, alert_message: str, event_id: str):
         """Wrapper to match the callback signature."""
-        await send_alert(alert_message, event_id)
+        await send_alert(event_name, alert_message, event_id)
 
     def run_event_loop(self):
         """Run the asyncio event loop."""
