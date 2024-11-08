@@ -5,9 +5,13 @@ import threading
 import logging
 from collections import defaultdict
 from datetime import datetime
-from scapy.all import sniff, IP, TCP
+from scapy.all import conf, sniff, IP, TCP
 from typing import Callable
 from .base_monitor import BaseMonitor
+
+
+# Clear scapy sessions
+conf.sessions = {}
 
 class PortScanMonitor(BaseMonitor):
     """Class to detect port scans using scapy."""

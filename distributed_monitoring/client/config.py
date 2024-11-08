@@ -2,7 +2,7 @@
 import os
 
 # Configuration Parameters
-SERVER_IP = os.getenv("SERVER_IP", "192.168.86.29")  # Replace with server's IP address
+SERVER_IP = os.getenv("SERVER_IP", "172.20.10.2")  # Replace with server's IP address
 STATUS_PORT = int(os.getenv("STATUS_PORT", 5001))
 ALERT_PORT = int(os.getenv("ALERT_PORT", 5002))
 SCAN_THRESHOLD = int(os.getenv("SCAN_THRESHOLD", 20))  # Port scan detection threshold

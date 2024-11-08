@@ -1,7 +1,7 @@
-# main.py
 import logging
 import signal
-import sys
+import time
+import platform
 from client_manager import ClientManager
 from config import SERVER_IP, STATUS_PORT, ALERT_PORT
 
@@ -14,16 +14,31 @@ def main():
     manager = ClientManager(SERVER_IP, STATUS_PORT, ALERT_PORT)
     manager.run()
 
-    # Handle graceful shutdown on SIGINT and SIGTERM
-    def handle_shutdown(signum, frame):
+    shutdown_event = False
+
+    # Define shutdown handler
+    def handle_shutdown(signum=None, frame=None):
+        nonlocal shutdown_event
+        logging.info("Shutdown signal received, shutting down...")
         manager.shutdown()
-        sys.exit(0)
+        shutdown_event = True
 
-    signal.signal(signal.SIGINT, handle_shutdown)
-    signal.signal(signal.SIGTERM, handle_shutdown)
+    # Set up signal handlers for non-Windows systems
+    if platform.system() != 'Windows':
+        signal.signal(signal.SIGINT, handle_shutdown)
+        signal.signal(signal.SIGTERM, handle_shutdown)
+    else:
+        logging.info("Running on Windows; use Ctrl+C to stop the server.")
 
-    # Keep the main thread alive to listen for signals
-    signal.pause()
+    try:
+        # Keep the main loop alive until shutdown event is triggered
+        while not shutdown_event:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        # Handle Ctrl+C for Windows
+        handle_shutdown()
+    finally:
+        logging.info("Server has shut down.")
 
 if __name__ == "__main__":
-        main()
+    main()

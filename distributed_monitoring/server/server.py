@@ -1,4 +1,5 @@
 import asyncio
+import platform
 import ssl
 import socket
 import io
@@ -382,10 +383,14 @@ async def main():
     # Event to signal shutdown
     shutdown_event = asyncio.Event()
 
-    # Handle signals for graceful shutdown
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, shutdown_event.set)
+   # Cross-platform signal handling
+    if platform.system() != 'Windows':
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, shutdown_event.set)
+    else:
+        # For Windows, we'll rely on KeyboardInterrupt outside of this function
+        logging.info("Running on Windows; shutdown will rely on KeyboardInterrupt")
 
     # Start Flask server
     flask_server = FlaskServerThread(app, host="0.0.0.0", port=3000)
@@ -434,5 +439,6 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         logging.info("Server shutdown requested by user.")
+        asyncio.run(main().shutdown_event.set())
     except Exception as e:
         logging.error(f"Server encountered an unexpected error: {e}")
