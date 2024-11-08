@@ -1,5 +1,6 @@
 # client_manager.py
 import asyncio
+import os
 import threading
 import logging
 import signal
@@ -15,7 +16,7 @@ from config import (
     STATUS_INTERVAL
 )
 from networking import send_status, send_alert
-from monitors import PortScanMonitor
+from monitors import PortScanMonitor, DLPMonitor
 
 class ClientManager:
     """Manager to handle all client functions, including status updates and alerts."""
@@ -28,18 +29,43 @@ class ClientManager:
         scan_threshold: int = SCAN_THRESHOLD,
         time_window: int = TIME_WINDOW,
         cooldown: int = COOLDOWN_PERIOD,
-        status_interval: int = STATUS_INTERVAL
+        status_interval: int = STATUS_INTERVAL,
+        monitored_paths: list[str] = None
     ):
+        # Network settings
         self.server_ip = server_ip
         self.status_port = status_port
         self.alert_port = alert_port
+        
+        # Monitor settings
         self.scan_threshold = scan_threshold
         self.time_window = time_window
         self.cooldown = cooldown
         self.status_interval = status_interval
-        self.modules: Dict[str, Callable] = {}  # Dictionary to store registered functions
-        self.loop = asyncio.new_event_loop()  # Create a new event loop
+        
+        # Initialize event loop and shutdown event
+        self.loop = asyncio.new_event_loop()
         self.shutdown_event = threading.Event()
+        
+        # Initialize modules dictionary
+        self.modules = {}
+        
+        # Set up monitored paths
+        test_dir = os.path.join(os.path.expanduser("~"), "dlp_test")
+        os.makedirs(test_dir, exist_ok=True)
+        self.monitored_paths = [test_dir] if monitored_paths is None else monitored_paths
+
+    def send_status_updates(self):
+        """Start the status update sender."""
+        try:
+            send_status(
+                server_ip=self.server_ip,
+                port=self.status_port,
+                shutdown_event=self.shutdown_event,
+                interval=self.status_interval
+            )
+        except Exception as e:
+            logging.error(f"Error in status updates: {e}")
 
     def register_module(self, name: str, module_func: Callable):
         """Register a new module to the client manager."""
@@ -78,7 +104,7 @@ class ClientManager:
 
         # Initialize and register modules
         port_scan_monitor = PortScanMonitor(
-            alert_callback=self.send_alert_async,
+            alert_callback=self.send_alert_async,  # Use send_alert_async consistently
             loop=self.loop,
             threshold=self.scan_threshold,
             time_window=self.time_window,
@@ -86,6 +112,18 @@ class ClientManager:
         )
         self.register_module("PortScanMonitor", port_scan_monitor.start)
 
+        # Initialize DLP Monitor
+        self.dlp_monitor = DLPMonitor(
+            alert_callback=self.send_alert_async,
+            loop=self.loop,
+            paths_to_monitor=self.monitored_paths,  # Use the monitored_paths list
+            sensitive_keywords={"confidential", "secret", "private", "internal-only"},
+            threshold=3,
+            time_window=60,
+            cooldown=10
+        )
+        self.register_module("DLPMonitor", self.dlp_monitor.start)
+        self.register_module("DLPMonitor", self.dlp_monitor.start)
         # Start all registered modules
         self.start_all_modules()
 
