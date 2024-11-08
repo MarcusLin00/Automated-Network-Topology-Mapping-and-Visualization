@@ -45,6 +45,13 @@ fi
 
 echo "Detected IP: $CURRENT_IP"
 
+# Define paths to /server and /client directories
+SERVER_DIR="./server"
+CLIENT_DIR="./client"
+
+# Ensure directories exist
+mkdir -p "$SERVER_DIR" "$CLIENT_DIR"
+
 # Generate OpenSSL configuration file
 cat <<EOF > openssl.cnf
 [ req ]
@@ -69,36 +76,18 @@ subjectAltName = @alt_names
 IP.1 = $CURRENT_IP
 EOF
 
-# Generate private key and CSR
-openssl req -new -out server.csr -newkey rsa:2048 -nodes -keyout server.key -config openssl.cnf
+# Generate private key and CSR directly in the server directory
+openssl req -new -out "$SERVER_DIR/server.csr" -newkey rsa:2048 -nodes -keyout "$SERVER_DIR/server.key" -config openssl.cnf
 
-# Generate self-signed certificate
-openssl x509 -req -in server.csr -signkey server.key -out server.crt -days 365 -extensions req_ext -extfile openssl.cnf
+# Generate self-signed certificate in the server directory
+openssl x509 -req -in "$SERVER_DIR/server.csr" -signkey "$SERVER_DIR/server.key" -out "$SERVER_DIR/server.crt" -days 365 -extensions req_ext -extfile openssl.cnf
+
+# Copy the generated certificate to the client directory
+cp "$SERVER_DIR/server.crt" "$CLIENT_DIR/server.crt"
 
 # Verification step
 echo "Generated certificate for IP: $CURRENT_IP"
-openssl x509 -in server.crt -text -noout | grep -A1 "Subject Alternative Name"
-
-# Define paths to /server and /client directories
-SERVER_DIR="./server"
-CLIENT_DIR="./client"
-
-# Copy the generated certificate and key to /server
-if [[ -d "$SERVER_DIR" ]]; then
-  cp server.crt "$SERVER_DIR/server.crt"
-  cp server.key "$SERVER_DIR/server.key"
-  echo "Copied server.crt and server.key to /server directory."
-else
-  echo "/server directory not found."
-fi
-
-# Copy the generated certificate to /client
-if [[ -d "$CLIENT_DIR" ]]; then
-  cp server.crt "$CLIENT_DIR/server.crt"
-  echo "Copied server.crt to /client directory."
-else
-  echo "/client directory not found."
-fi
+openssl x509 -in "$SERVER_DIR/server.crt" -text -noout | grep -A1 "Subject Alternative Name"
 
 # Cleanup
-rm -f server.csr openssl.cnf
+rm -f "$SERVER_DIR/server.csr" openssl.cnf
