@@ -3,24 +3,31 @@ import time
 from pathlib import Path
 import logging
 
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
 def create_sensitive_file(test_dir: str, index: int, content: str):
     """Create a file with sensitive content."""
     file_path = Path(test_dir) / f"sensitive_file_{index}.txt"
     logging.info(f"Creating sensitive file: {file_path}")
-    with open(file_path, "w") as f:
-        f.write(content)
+    try:
+        with open(file_path, "w") as f:
+            f.write(content)
+    except PermissionError:
+        logging.error(f"Permission denied when trying to create {file_path}. Check your permissions.")
     return file_path
 
 def modify_file(file_path: Path):
     """Modify an existing file."""
     logging.info(f"Modifying file: {file_path}")
-    with open(file_path, "a") as f:
-        f.write("\nAdditional confidential information")
+    try:
+        with open(file_path, "a") as f:
+            f.write("\nAdditional confidential information")
+    except PermissionError:
+        logging.error(f"Permission denied when trying to modify {file_path}. Check your permissions.")
 
 def main():
-    # Get the test directory path
+    # Get the test directory path in the user's home directory (macOS compatible)
     test_dir = os.path.join(os.path.expanduser("~"), "dlp_test")
     os.makedirs(test_dir, exist_ok=True)
     

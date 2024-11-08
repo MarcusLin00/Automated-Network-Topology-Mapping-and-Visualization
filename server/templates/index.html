@@ -80,9 +80,12 @@
             padding: 20px;
             border: 1px solid #888;
             width: 90%; 
-            max-width: 800px;
+            max-width: 1000px;
             border-radius: 8px;
             position: relative;
+        }
+        .table-wrapper {
+            overflow-x: auto;
         }
         .close {
             color: #aaa;
@@ -193,20 +196,22 @@
         <div class="modal-content">
             <span class="close">&times;</span>
             <h2>Alerts for <span id="modalDeviceIP"></span></h2>
-            <table class="alert-table" id="modalAlertTable">
-                <thead>
-                    <tr>
-                        <th>Event</th>
-                        <th>Details</th>
-                        <th>Timestamp</th>
-                        <th>Event ID</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Alert data will be inserted here -->
-                </tbody>
-            </table>
+            <div class="table-wrapper">
+                <table class="alert-table" id="modalAlertTable">
+                    <thead>
+                        <tr>
+                            <th>Event</th>
+                            <th>Details</th>
+                            <th>Timestamp</th>
+                            <th>Event ID</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Alert data will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
