@@ -81,9 +81,18 @@ class ClientManager:
         """Start the status update sender."""
         send_status(self.shutdown_event, self.status_interval)
 
-    async def send_alert_async(self, event_name, alert_message: str, event_id: str):
+    async def send_alert_async(self, event_name: str, alert_message: str, event_id: str):
         """Wrapper to match the callback signature."""
-        await send_alert(event_name, alert_message, event_id)
+        logging.info(f"Attempting to send alert - Event: {event_name}, Message: {alert_message}")
+        try:
+            await send_alert(
+                event_name,      # Pass event_name directly
+                alert_message,   # Pass alert_message directly
+                event_id        # Pass event_id directly
+            )
+            logging.info("Alert sent successfully")
+        except Exception as e:
+            logging.error(f"Failed to send alert: {e}")
 
     def run_event_loop(self):
         """Run the asyncio event loop."""

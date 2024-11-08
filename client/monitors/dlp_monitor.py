@@ -64,7 +64,9 @@ class DLPMonitor(BaseMonitor):
     def check_file_activity(self, filepath: str, action: str):
         """Check if file contains sensitive data and track activity."""
         try:
+            logging.info(f"Checking file activity: {filepath} ({action})")
             if self._is_sensitive_file(filepath):
+                logging.info(f"Sensitive content detected in file: {filepath}")
                 current_time = time.time()
                 self.file_activities.append(current_time)
                 
@@ -74,6 +76,7 @@ class DLPMonitor(BaseMonitor):
                     if current_time - t <= self.time_window
                 ]
 
+                logging.info(f"Current activity count: {len(self.file_activities)}/{self.threshold}")
                 # Check if we've exceeded the threshold
                 if len(self.file_activities) >= self.threshold:
                     if current_time - self.last_alert_time >= self.cooldown:
@@ -95,6 +98,8 @@ class DLPMonitor(BaseMonitor):
                         )
                         self.last_alert_time = current_time
                         self.file_activities.clear()
+            else:
+                logging.info(f"No sensitive content detected in file: {filepath}")
 
         except Exception as e:
             logging.error(f"Error processing file {filepath}: {str(e)}")
