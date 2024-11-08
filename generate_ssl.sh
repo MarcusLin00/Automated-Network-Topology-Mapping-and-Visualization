@@ -22,9 +22,17 @@ get_ip_unix() {
 
 # Function to get IP address for Windows using PowerShell
 get_ip_windows() {
-  IP=$(powershell.exe -Command "(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { \$_.InterfaceAlias -eq 'Wi-Fi' -or \$_.InterfaceAlias -eq 'Ethernet' }).IPAddress")
+  # Try to get IP from Wi-Fi interface
+  IP=$(powershell.exe -Command "(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { \$_.InterfaceAlias -eq 'Wi-Fi' }).IPAddress")
   IP=$(echo "$IP" | tr -d '\r')
 
+  # If IP is empty, try Ethernet interface
+  if [ -z "$IP" ]; then
+    IP=$(powershell.exe -Command "(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { \$_.InterfaceAlias -eq 'Ethernet' }).IPAddress")
+    IP=$(echo "$IP" | tr -d '\r')
+  fi
+
+  # If still empty, show an error
   if [ -z "$IP" ]; then
     echo "Could not determine IP address. Make sure you're connected to a network."
     exit 1

@@ -132,7 +132,7 @@ class ClientManager:
             cooldown=10
         )
         self.register_module("DLPMonitor", self.dlp_monitor.start)
-        self.register_module("DLPMonitor", self.dlp_monitor.start)
+
         # Start all registered modules
         self.start_all_modules()
 
