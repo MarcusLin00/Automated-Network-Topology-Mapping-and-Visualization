@@ -15,7 +15,8 @@ from config import (
     STATUS_INTERVAL
 )
 from networking import send_status, send_alert
-from monitors import PortScanMonitor
+from monitors import PortScanMonitor, DeviceHealthMonitor
+
 
 class ClientManager:
     """Manager to handle all client functions, including status updates and alerts."""
@@ -28,7 +29,12 @@ class ClientManager:
         scan_threshold: int = SCAN_THRESHOLD,
         time_window: int = TIME_WINDOW,
         cooldown: int = COOLDOWN_PERIOD,
-        status_interval: int = STATUS_INTERVAL
+        status_interval: int = STATUS_INTERVAL,
+        cpu_threshold: int = 90,  
+        mem_threshold: int = 80, 
+        check_interval: int = 5,
+        
+        
     ):
         self.server_ip = server_ip
         self.status_port = status_port
@@ -37,6 +43,9 @@ class ClientManager:
         self.time_window = time_window
         self.cooldown = cooldown
         self.status_interval = status_interval
+        self.cpu_threshold = cpu_threshold
+        self.mem_threshold = mem_threshold
+        self.check_interval = check_interval
         self.modules: Dict[str, Callable] = {}  # Dictionary to store registered functions
         self.loop = asyncio.new_event_loop()  # Create a new event loop
         self.shutdown_event = threading.Event()
@@ -85,6 +94,17 @@ class ClientManager:
             cooldown=self.cooldown
         )
         self.register_module("PortScanMonitor", port_scan_monitor.start)
+        
+        device_health_monitor = DeviceHealthMonitor(
+            alert_callback=self.send_alert_async, 
+            loop=self.loop, 
+            cpu_threshold=self.cpu_threshold,  
+            mem_threshold=self.mem_threshold,  
+            check_interval=self.check_interval,  
+            cooldown=self.cooldown  
+)
+
+        self.register_module("DeviceHealthMonitor", device_health_monitor.start)
 
         # Start all registered modules
         self.start_all_modules()
