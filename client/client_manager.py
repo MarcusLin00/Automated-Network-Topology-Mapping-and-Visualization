@@ -16,7 +16,7 @@ from config import (
     STATUS_INTERVAL
 )
 from networking import send_status, send_alert
-from monitors import PortScanMonitor, DLPMonitor
+from monitors import PortScanMonitor, DLPMonitor, DeviceHealthMonitor
 
 class ClientManager:
     """Manager to handle all client functions, including status updates and alerts."""
@@ -30,7 +30,11 @@ class ClientManager:
         time_window: int = TIME_WINDOW,
         cooldown: int = COOLDOWN_PERIOD,
         status_interval: int = STATUS_INTERVAL,
-        monitored_paths: list[str] = None
+        monitored_paths: list[str] = None,
+        cpu_threshold: int = 90,  
+        mem_threshold: int = 80, 
+        check_interval: int = 5,
+        
     ):
         # Network settings
         self.server_ip = server_ip
@@ -42,9 +46,11 @@ class ClientManager:
         self.time_window = time_window
         self.cooldown = cooldown
         self.status_interval = status_interval
-        
-        # Initialize event loop and shutdown event
-        self.loop = asyncio.new_event_loop()
+        self.cpu_threshold = cpu_threshold
+        self.mem_threshold = mem_threshold
+        self.check_interval = check_interval
+        self.modules: Dict[str, Callable] = {}  # Dictionary to store registered functions
+        self.loop = asyncio.new_event_loop()  # Create a new event loop
         self.shutdown_event = threading.Event()
         
         # Initialize modules dictionary
@@ -119,7 +125,19 @@ class ClientManager:
             time_window=self.time_window,
             cooldown=self.cooldown
         )
+        
         self.register_module("PortScanMonitor", port_scan_monitor.start)
+        
+        device_health_monitor = DeviceHealthMonitor(
+            alert_callback=self.send_alert_async, 
+            loop=self.loop, 
+            cpu_threshold=self.cpu_threshold,  
+            mem_threshold=self.mem_threshold,  
+            check_interval=self.check_interval,  
+            cooldown=self.cooldown  
+        )
+
+        self.register_module("DeviceHealthMonitor", device_health_monitor.start)
 
         # Initialize DLP Monitor
         self.dlp_monitor = DLPMonitor(
@@ -131,6 +149,7 @@ class ClientManager:
             time_window=60,
             cooldown=10
         )
+
         self.register_module("DLPMonitor", self.dlp_monitor.start)
 
         # Start all registered modules
