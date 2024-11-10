@@ -115,14 +115,19 @@ class SafeNetworkMonitor:
                 self.status = 'Error: Subnet not determined'
 
     def _scan_network(self, nm, subnet):
-        network = str(subnet)
-        nm.scan(hosts=network, arguments='-sn')
-        current_time = time.time()
-        with self.lock:
-            for host in nm.all_hosts():
-                self._update_device_info(host, nm, current_time)
-            self._add_current_device(current_time)
-            self._remove_stale_devices(current_time)
+        try:
+            network = str(subnet)
+            nm.scan(hosts=network, arguments='-sn')
+            current_time = time.time()
+            with self.lock:
+                for host in nm.all_hosts():
+                    self._update_device_info(host, nm, current_time)
+                self._add_current_device(current_time)
+                self._remove_stale_devices(current_time)
+        except nmap.PortScannerError as e:
+            logging.warning(f"Scan interrupted: {e}")
+        except Exception as e:
+            logging.error(f"Error during network scan: {e}")
 
     def _update_device_info(self, host, nm, current_time):
         ip, mac = host, nm[host]['addresses'].get('mac', 'N/A')
@@ -380,55 +385,64 @@ def start_background_scanner(shutdown_event):
 
 
 async def main():
-    # Event to signal shutdown
-    shutdown_event = asyncio.Event()
+  shutdown_event = asyncio.Event()
+  tasks = []
+  
+  try:
+      # Cross-platform signal handling
+      if platform.system() != 'Windows':
+          loop = asyncio.get_running_loop()
+          for sig in (signal.SIGINT, signal.SIGTERM):
+              loop.add_signal_handler(sig, shutdown_event.set)
+      else:
+          logging.info("Running on Windows; shutdown will rely on KeyboardInterrupt")
 
-   # Cross-platform signal handling
-    if platform.system() != 'Windows':
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, shutdown_event.set)
-    else:
-        # For Windows, we'll rely on KeyboardInterrupt outside of this function
-        logging.info("Running on Windows; shutdown will rely on KeyboardInterrupt")
+      # Start Flask server
+      flask_server = FlaskServerThread(app, host="0.0.0.0", port=3000)
+      flask_server.start()
 
-    # Start Flask server
-    flask_server = FlaskServerThread(app, host="0.0.0.0", port=3000)
-    flask_server.start()
+      # Start background scanner thread
+      scanner_shutdown_event = threading.Event()
+      scanner_thread = threading.Thread(target=start_background_scanner, args=(scanner_shutdown_event,), daemon=True)
+      scanner_thread.start()
 
-    # Start background scanner thread
-    scanner_shutdown_event = threading.Event()
-    scanner_thread = threading.Thread(target=start_background_scanner, args=(scanner_shutdown_event,), daemon=True)
-    scanner_thread.start()
+      # Start UDP and TCP servers
+      tasks.extend([
+          asyncio.create_task(udp_server(shutdown_event)),
+          asyncio.create_task(tcp_server(shutdown_event))
+      ])
 
-    # Start UDP and TCP servers
-    udp_task = asyncio.create_task(udp_server(shutdown_event))
-    tcp_task = asyncio.create_task(tcp_server(shutdown_event))
+      # Wait for shutdown signal
+      await shutdown_event.wait()
+      
+  except asyncio.CancelledError:
+      logging.info("Main task cancelled")
+  finally:
+      logging.info("Initiating shutdown sequence...")
+      
+      # Cancel all tasks
+      for task in tasks:
+          task.cancel()
+      
+      if tasks:
+          await asyncio.gather(*tasks, return_exceptions=True)
+      
+      # Shutdown Flask server
+      try:
+          flask_server.shutdown()
+          flask_server.join(timeout=5)
+      except Exception as e:
+          logging.error(f"Error shutting down Flask server: {e}")
 
-    # Wait for shutdown_event to be set
-    await shutdown_event.wait()
-    logging.info("Shutdown signal received.")
+      # Shutdown background scanner
+      try:
+          scanner_shutdown_event.set()
+          scanner_thread.join(timeout=5)
+      except Exception as e:
+          logging.error(f"Error shutting down scanner thread: {e}")
 
-    # Initiate shutdown sequence
-    # Shutdown Flask server
-    flask_server.shutdown()
-    flask_server.join()
+      logging.info("All servers have been shut down.")
 
-    # Shutdown background scanner
-    scanner_shutdown_event.set()
-    scanner_thread.join()
-
-    # Cancel UDP and TCP server tasks
-    udp_task.cancel()
-    tcp_task.cancel()
-
-    # Wait for servers to shut down
-    try:
-        await asyncio.gather(udp_task, tcp_task, return_exceptions=True)
-    except Exception as e:
-        logging.error(f"Error during server shutdown: {e}")
-
-    logging.info("All servers have been shut down gracefully.")
 
 
 # Initialize SafeNetworkMonitor
@@ -439,6 +453,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         logging.info("Server shutdown requested by user.")
-        asyncio.run(main().shutdown_event.set())
     except Exception as e:
         logging.error(f"Server encountered an unexpected error: {e}")
+    finally:
+        logging.info("Server shutdown complete.")
