@@ -38,15 +38,15 @@ class DeviceHealthMonitor(BaseMonitor):
         self.alerted_metrics = defaultdict(lambda: 0)  # {metric_name: last_alert_timestamp}
         self.lock = threading.Lock()
         self.loop = loop
-        self.running = False
-
+        self.stop_event = threading.Event()
+        
     def check_metrics(self):
         """Check system metrics and detect anomalies."""
-        while self.running:
+        while not self.stop_event.is_set():
             current_time = time.time()
             with self.lock:
-                # Check CPU usage
-                cpu_usage = psutil.cpu_percent(interval=1)
+                # Non-blocking CPU usage check
+                cpu_usage = psutil.cpu_percent(interval=0)
                 logging.debug(f"Current CPU Usage: {cpu_usage}%")
                 if cpu_usage > self.cpu_threshold:
                     self._handle_alert("CPU Usage", cpu_usage, current_time)
@@ -57,7 +57,8 @@ class DeviceHealthMonitor(BaseMonitor):
                 if mem_usage > self.mem_threshold:
                     self._handle_alert("Memory Usage", mem_usage, current_time)
 
-            time.sleep(self.check_interval)
+            # Wait for the check_interval or until stop_event is set
+            self.stop_event.wait(self.check_interval)
 
     def _handle_alert(self, metric_name, metric_value, current_time):
         """Handle alert logic for a specific metric."""
@@ -82,11 +83,10 @@ class DeviceHealthMonitor(BaseMonitor):
 
     def start(self):
         logging.info("Starting DeviceHealthMonitor...")
-        self.running = True
         self.thread = threading.Thread(target=self.check_metrics, daemon=True)
         self.thread.start()
 
     def stop(self):
         logging.info("Stopping DeviceHealthMonitor...")
-        self.running = False
+        self.stop_event.set()
         self.thread.join()

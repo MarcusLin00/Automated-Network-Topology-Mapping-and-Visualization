@@ -5,7 +5,7 @@ import threading
 import logging
 from collections import defaultdict
 from datetime import datetime
-from scapy.all import conf, sniff, IP, TCP
+from scapy.all import conf, sniff, IP, TCP, AsyncSniffer
 from typing import Callable
 from .base_monitor import BaseMonitor
 
@@ -41,6 +41,7 @@ class PortScanMonitor(BaseMonitor):
         self.alerted_ips = {}  # {src_ip: last_alert_timestamp}
         self.lock = threading.Lock()
         self.loop = loop  # Reference to the ClientManager's event loop
+        self.sniffer = None 
 
     def detect(self, packet):
         if packet.haslayer(IP) and packet.haslayer(TCP):
@@ -95,4 +96,11 @@ class PortScanMonitor(BaseMonitor):
 
     def start(self):
         logging.info("Starting PortScanMonitor...")
-        sniff(filter="tcp", prn=self.detect, store=0)
+        self.sniffer = AsyncSniffer(filter="tcp", prn=self.detect, store=0)
+        self.sniffer.start()
+
+    def stop(self):
+        if self.sniffer:
+            logging.info("Stopping PortScanMonitor...")
+            self.sniffer.stop()
+            self.sniffer = None

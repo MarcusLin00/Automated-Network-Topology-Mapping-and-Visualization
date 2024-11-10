@@ -1,6 +1,7 @@
 import time
 import asyncio
 import logging
+import os
 from datetime import datetime
 from typing import Callable, Set
 from watchdog.observers import Observer
@@ -50,8 +51,17 @@ class DLPMonitor(BaseMonitor):
         """
         self.alert_callback = alert_callback
         self.loop = loop
-        self.paths = paths_to_monitor
-        self.keywords = sensitive_keywords
+
+        # Set up monitored paths with default test directory if not provided
+        home_dir = os.path.expanduser("~")
+        default_path = os.path.join(home_dir, "test_dlp")
+        self.paths = [
+            path if path.startswith(home_dir) else os.path.join(home_dir, path.lstrip("/"))
+            for path in (paths_to_monitor or [default_path])
+        ]
+
+        # Sensitive keywords and thresholds
+        self.keywords = sensitive_keywords if sensitive_keywords else set()
         self.threshold = threshold
         self.time_window = time_window
         self.cooldown = cooldown
@@ -128,6 +138,7 @@ class DLPMonitor(BaseMonitor):
 
     def start(self):
         """Start monitoring the specified paths."""
+        logging.info("Starting DLPMonitor...")
         for path in self.paths:
             self.observer.schedule(self.event_handler, path, recursive=True)
         self.observer.start()
@@ -135,5 +146,6 @@ class DLPMonitor(BaseMonitor):
 
     def stop(self):
         """Stop the file system observer."""
+        logging.info("Stopping DLPMonitor...")
         self.observer.stop()
         self.observer.join()

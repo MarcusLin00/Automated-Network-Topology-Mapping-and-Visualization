@@ -13,7 +13,8 @@ from config import (
     SCAN_THRESHOLD,
     TIME_WINDOW,
     COOLDOWN_PERIOD,
-    STATUS_INTERVAL
+    STATUS_INTERVAL,
+    MONITORED_PATHS,
 )
 from networking import send_status, send_alert
 from monitors import PortScanMonitor, DLPMonitor, DeviceHealthMonitor, MalwarePhishingMonitor
@@ -32,7 +33,7 @@ class ClientManager:
         time_window: int = TIME_WINDOW,
         cooldown: int = COOLDOWN_PERIOD,
         status_interval: int = STATUS_INTERVAL,
-        monitored_paths: list[str] = None,
+        monitored_paths: list[str] = MONITORED_PATHS, 
         cpu_threshold: int = 90,  
         mem_threshold: int = 80, 
         check_interval: int = 5,
@@ -43,6 +44,15 @@ class ClientManager:
         self.status_port = status_port
         self.alert_port = alert_port
         
+        # Modules settings
+        self.modules: Dict[str, Callable] = {}  # Dictionary to store registered functions
+        self.loop = asyncio.new_event_loop()  # Create a new event loop
+        self.shutdown_event = threading.Event()
+        
+        # Initialize modules dictionary
+        self.modules = {}
+
+
         # Monitor settings
         self.scan_threshold = scan_threshold
         self.time_window = time_window
@@ -51,17 +61,7 @@ class ClientManager:
         self.cpu_threshold = cpu_threshold
         self.mem_threshold = mem_threshold
         self.check_interval = check_interval
-        self.modules: Dict[str, Callable] = {}  # Dictionary to store registered functions
-        self.loop = asyncio.new_event_loop()  # Create a new event loop
-        self.shutdown_event = threading.Event()
-        
-        # Initialize modules dictionary
-        self.modules = {}
-        
-        # Set up monitored paths
-        test_dir = os.path.join(os.path.expanduser("~"), "dlp_test")
-        os.makedirs(test_dir, exist_ok=True)
-        self.monitored_paths = [test_dir] if monitored_paths is None else monitored_paths
+        self.monitored_paths = monitored_paths
 
     def send_status_updates(self):
         """Start the status update sender."""
@@ -75,15 +75,22 @@ class ClientManager:
         except Exception as e:
             logging.error(f"Error in status updates: {e}")
 
-    def register_module(self, name: str, module_func: Callable):
+    def register_module(self, name: str, module_instance):
         """Register a new module to the client manager."""
-        self.modules[name] = module_func
+        self.modules[name] = module_instance  
 
     def start_all_modules(self):
         """Start all registered modules."""
         for name, module in self.modules.items():
             logging.info(f"Starting module: {name}")
-            threading.Thread(target=module, daemon=True).start()
+            module.start()
+        logging.info(f"All modules started")
+
+    def stop_all_modules(self):
+        for name, module in self.modules.items():
+            module.stop()
+            logging.info(f"Module: {name} stopped.")
+        logging.info(f"All modules stopped")
 
     def send_status_updates(self):
         """Start the status update sender."""
@@ -94,9 +101,9 @@ class ClientManager:
         logging.info(f"Attempting to send alert - Event: {event_name}, Message: {alert_message}")
         try:
             await send_alert(
-                event_name,      # Pass event_name directly
-                alert_message,   # Pass alert_message directly
-                event_id        # Pass event_id directly
+                event_name,     
+                alert_message,   
+                event_id     
             )
             logging.info("Alert sent successfully")
         except Exception as e:
@@ -120,6 +127,8 @@ class ClientManager:
         logging.info("Status update thread started.")
 
         # Initialize and register modules
+
+        # Initialize Port Scan Monitor
         port_scan_monitor = PortScanMonitor(
             alert_callback=self.send_alert_async,  # Use send_alert_async consistently
             loop=self.loop,
@@ -127,20 +136,8 @@ class ClientManager:
             time_window=self.time_window,
             cooldown=self.cooldown
         )
+        self.register_module("PortScanMonitor", port_scan_monitor)
         
-        self.register_module("PortScanMonitor", port_scan_monitor.start)
-        
-        device_health_monitor = DeviceHealthMonitor(
-            alert_callback=self.send_alert_async, 
-            loop=self.loop, 
-            cpu_threshold=self.cpu_threshold,  
-            mem_threshold=self.mem_threshold,  
-            check_interval=self.check_interval,  
-            cooldown=self.cooldown  
-        )
-
-        self.register_module("DeviceHealthMonitor", device_health_monitor.start)
-
         # Initialize DLP Monitor
         self.dlp_monitor = DLPMonitor(
             alert_callback=self.send_alert_async,
@@ -151,24 +148,38 @@ class ClientManager:
             time_window=60,
             cooldown=10
         )
+        self.register_module("DLPMonitor", self.dlp_monitor)
+        
+        # Initialize Device Health Monitor 
+        device_health_monitor = DeviceHealthMonitor(
+            alert_callback=self.send_alert_async, 
+            loop=self.loop, 
+            cpu_threshold=self.cpu_threshold,  
+            mem_threshold=self.mem_threshold,  
+            check_interval=self.check_interval,  
+            cooldown=self.cooldown  
+        )
+        self.register_module("DeviceHealthMonitor", device_health_monitor)
 
-        self.register_module("DLPMonitor", self.dlp_monitor.start)
-
+        # Initialize Malware Phishing Monitor
         malware_phishing_monitor = MalwarePhishingMonitor(
             alert_callback=self.send_alert_async,
             loop=self.loop,
             cooldown=self.cooldown
         )
-        self.register_module("MalwarePhishinMonitor", malware_phishing_monitor.start)
+        self.register_module("MalwarePhishinMonitor", malware_phishing_monitor)
 
         # Start all registered modules
         self.start_all_modules()
 
     def shutdown(self):
-        """Gracefully shutdown the client manager."""
         logging.info("Shutting down ClientManager...")
         self.shutdown_event.set()
         self.status_thread.join()
+
+        # Stop all modules
+        self.stop_all_modules()
+
         self.loop.call_soon_threadsafe(self.loop.stop)
         self.loop_thread.join()
         logging.info("ClientManager shutdown complete.")

@@ -28,7 +28,7 @@ def modify_file(file_path: Path):
 
 def main():
     # Get the test directory path in the user's home directory (macOS compatible)
-    test_dir = os.path.join(os.path.expanduser("~"), "dlp_test")
+    test_dir = os.path.join(os.path.expanduser("~"), "test_dlp")
     os.makedirs(test_dir, exist_ok=True)
     
     logging.info("Starting DLP test sequence...")
