@@ -16,7 +16,9 @@ from config import (
     STATUS_INTERVAL
 )
 from networking import send_status, send_alert
-from monitors import PortScanMonitor, DLPMonitor, DeviceHealthMonitor
+from monitors import PortScanMonitor, DLPMonitor, DeviceHealthMonitor, MalwarePhishingMonitor
+
+
 
 class ClientManager:
     """Manager to handle all client functions, including status updates and alerts."""
@@ -151,6 +153,13 @@ class ClientManager:
         )
 
         self.register_module("DLPMonitor", self.dlp_monitor.start)
+
+        malware_phishing_monitor = MalwarePhishingMonitor(
+            alert_callback=self.send_alert_async,
+            loop=self.loop,
+            cooldown=self.cooldown
+        )
+        self.register_module("MalwarePhishinMonitor", malware_phishing_monitor.start)
 
         # Start all registered modules
         self.start_all_modules()

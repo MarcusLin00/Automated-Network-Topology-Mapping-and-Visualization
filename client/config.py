@@ -15,3 +15,8 @@ CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", 5))
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH", "server.crt")
 AES_KEY_PATH = os.getenv("AES_KEY_PATH", "aes_key.pem")
 AES_PASSPHRASE = os.getenv("AES_PASSPHRASE", "cs204")
+
+# Threat Intelligence API Settings
+THREAT_INTEL_API_URL = os.getenv("THREAT_INTEL_API_URL", "https://urlhaus-api.abuse.ch/v1/url/")
+THREAT_INTEL_TIMEOUT = int(os.getenv("THREAT_INTEL_TIMEOUT", 5))  # seconds
+THREAT_INTEL_RETRIES = int(os.getenv("THREAT_INTEL_RETRIES", 3))  # number of retries
