@@ -1,1 +1,4 @@
 __pycache__/
+# Ignore all .key .crt files in any directory
+*.key
+*.crt
