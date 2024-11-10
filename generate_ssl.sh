@@ -17,13 +17,9 @@ get_ip_unix() {
 
 # Function to get IP address for Windows using PowerShell
 get_ip_windows() {
-<<<<<<< HEAD
+
   # Find interface name dynamically, prioritizing WiFi, then Ethernet
   INTERFACE_NAME=$(powershell.exe -Command "(Get-NetAdapter | Where-Object { \$_.Name -match 'WiFi|Wi-Fi|Ethernet' }).Name" | tr -d '\r')
-=======
-  # Find interface name dynamically, prioritizing Wi-Fi, then Ethernet
-  INTERFACE_NAME=$(powershell.exe -Command "(Get-NetAdapter | Where-Object { \$_.Name -match 'Wi-Fi|WiFi|Ethernet' }).Name" | tr -d '\r')
->>>>>>> origin/phishing
 
   # Fetch the IP address for the selected interface, excluding APIPA (169.254.x.x) addresses
   IP=$(powershell.exe -Command "(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { \$_.InterfaceAlias -eq '$INTERFACE_NAME' -and \$_.IPAddress -notmatch '^169\.254' }).IPAddress" | tr -d '\r')
