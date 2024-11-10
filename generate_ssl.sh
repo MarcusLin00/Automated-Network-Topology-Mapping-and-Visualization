@@ -12,31 +12,16 @@ get_ip_unix() {
     IP=$(hostname -I | awk '{print $1}')
   fi
 
-  if [ -z "$IP" ]; then
-    echo "Could not determine IP address. Make sure you're connected to a network."
-    exit 1
-  fi
-
   echo "$IP"
 }
 
 # Function to get IP address for Windows using PowerShell
 get_ip_windows() {
-  # Try to get IP from Wi-Fi interface
-  IP=$(powershell.exe -Command "(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { \$_.InterfaceAlias -eq 'Wi-Fi' }).IPAddress")
-  IP=$(echo "$IP" | tr -d '\r')
+  # Find interface name dynamically, prioritizing WiFi, then Ethernet
+  INTERFACE_NAME=$(powershell.exe -Command "(Get-NetAdapter | Where-Object { \$_.Name -match 'WiFi|Wi-Fi|Ethernet' }).Name" | tr -d '\r')
 
-  # If IP is empty, try Ethernet interface
-  if [ -z "$IP" ]; then
-    IP=$(powershell.exe -Command "(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { \$_.InterfaceAlias -eq 'Ethernet' }).IPAddress")
-    IP=$(echo "$IP" | tr -d '\r')
-  fi
-
-  # If still empty, show an error
-  if [ -z "$IP" ]; then
-    echo "Could not determine IP address. Make sure you're connected to a network."
-    exit 1
-  fi
+  # Fetch the IP address for the selected interface, excluding APIPA (169.254.x.x) addresses
+  IP=$(powershell.exe -Command "(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { \$_.InterfaceAlias -eq '$INTERFACE_NAME' -and \$_.IPAddress -notmatch '^169\.254' }).IPAddress" | tr -d '\r')
 
   echo "$IP"
 }
@@ -45,10 +30,23 @@ get_ip_windows() {
 echo "OSTYPE is: $OSTYPE"
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
   # Windows
-  CURRENT_IP=$(get_ip_windows)
+  CURRENT_IP=$(get_ip_windows | head -n 1)  # Get only the first valid IP
 else
   # macOS or Linux
   CURRENT_IP=$(get_ip_unix)
+fi
+
+# Prompt user for IP if detection fails
+if [ -z "$CURRENT_IP" ]; then
+  echo "Could not automatically determine IP address."
+  read -p "Please enter your IP address manually: " USER_IP
+  CURRENT_IP="$USER_IP"
+fi
+
+# Ensure we have a valid IP before proceeding
+if [ -z "$CURRENT_IP" ]; then
+  echo "No valid IP address provided. Exiting."
+  exit 1
 fi
 
 echo "Detected IP: $CURRENT_IP"
