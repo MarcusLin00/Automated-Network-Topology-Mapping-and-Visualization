@@ -177,8 +177,11 @@
             <table id="deviceTable">
                 <thead>
                     <tr>
-                        <th>IP Address</th>
+                        <!-- <th>Device Name</th> -->
+                        <th>IP Add</th>
                         <th>MAC Address</th>
+                        <th>Data Sent</th>
+                        <th>Data Received</th>
                         <th>Last Seen</th>
                         <th>Status</th>
                         <th>Alerts</th> <!-- Alerts Column -->
@@ -264,6 +267,10 @@
                     for (let ip in data) {
                         const device = data[ip];
                         const row = document.createElement('tr');
+
+                        // const hostnameCell = document.createElement('td');
+                        // hostnameCell.textContent = device.hostname || 'Unknown';
+                        // row.appendChild(hostnameCell);
                         
                         const ipCell = document.createElement('td');
                         ipCell.textContent = ip;
@@ -272,6 +279,14 @@
                         const macCell = document.createElement('td');
                         macCell.textContent = device.mac;
                         row.appendChild(macCell);
+
+                        const dataSentCell = document.createElement('td');
+                        dataSentCell.textContent = device.data_usage.sent;
+                        row.appendChild(dataSentCell);
+
+                        const dataReceivedCell = document.createElement('td');
+                        dataReceivedCell.textContent = device.data_usage.received;
+                        row.appendChild(dataReceivedCell);
                         
                         const lastSeenCell = document.createElement('td');
                         const date = new Date(device.last_seen * 1000);
@@ -361,6 +376,7 @@
             }
             modal.style.display = 'block';
         }
+        
 
         function resolveAlert(eventId, row) {
             // Send POST request to resolve the alert

@@ -137,6 +137,31 @@ class ClientManager:
             cooldown=self.cooldown
         )
         self.register_module("PortScanMonitor", port_scan_monitor)
+
+        #modify-start
+        # Validate and create paths if needed
+        valid_paths = []
+        for path in self.monitored_paths:
+            # Expand user path if it contains ~
+            expanded_path = os.path.expanduser(path)
+            # Convert to absolute path
+            abs_path = os.path.abspath(expanded_path)
+            
+            try:
+                # Create directory if it doesn't exist
+                os.makedirs(abs_path, exist_ok=True)
+                valid_paths.append(abs_path)
+                logging.info(f"Monitoring path: {abs_path}")
+            except Exception as e:
+                logging.error(f"Failed to create/access path {abs_path}: {e}")
+
+        # If no valid paths, create and use a default monitoring directory
+        if not valid_paths:
+            default_path = os.path.join(os.path.expanduser("~"), "dlp_monitored")
+            os.makedirs(default_path, exist_ok=True)
+            valid_paths.append(default_path)
+            logging.info(f"Created default monitoring path: {default_path}")
+        #modify-end
         
         # Initialize DLP Monitor
         self.dlp_monitor = DLPMonitor(

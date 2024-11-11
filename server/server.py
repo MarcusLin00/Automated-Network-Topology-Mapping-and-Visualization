@@ -6,9 +6,11 @@ import io
 import ipaddress
 import json
 import logging
+import subprocess
 import threading
 import time
 import signal
+import threading
 
 from flask import Flask, render_template, Response, jsonify, request
 from datetime import datetime
@@ -21,6 +23,7 @@ import nmap
 from collections import defaultdict
 from werkzeug.serving import make_server
 from encryption_utils import verify_and_decrypt_message, load_aes_key, derive_keys
+from scapy.all import sniff, IP
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
@@ -51,6 +54,40 @@ class SafeNetworkMonitor:
         self.status = 'Idle'
         self.capture = None
         self.lock = threading.Lock()
+        self.data_usage = defaultdict(lambda: {'bytes_sent': 0, 'bytes_received': 0})
+        self.packet_capture_thread = None
+        self.capture_running = False
+
+    def start_traffic_monitoring(self):
+        self.capture_running = True
+        self.packet_capture_thread = threading.Thread(target=self._capture_packets)
+        self.packet_capture_thread.daemon = True
+        self.packet_capture_thread.start()
+
+    def _capture_packets(self):
+        def packet_callback(packet):
+            if IP in packet:
+                if packet[IP].src in self.devices:
+                    self.data_usage[packet[IP].src]['bytes_sent'] += len(packet)
+                if packet[IP].dst in self.devices:
+                    self.data_usage[packet[IP].dst]['bytes_received'] += len(packet)
+
+        while self.capture_running:
+            sniff(prn=packet_callback, store=0, timeout=2)
+
+    def get_device_usage(self, ip):
+        usage = self.data_usage[ip]
+        return {
+            'sent': self._format_bytes(usage['bytes_sent']),
+            'received': self._format_bytes(usage['bytes_received'])
+        }
+
+    def _format_bytes(self, bytes):
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if bytes < 1024:
+                return f"{bytes:.2f} {unit}"
+            bytes /= 1024
+        return f"{bytes:.2f} TB"
 
     def _get_default_interface(self):
         try:
@@ -131,10 +168,28 @@ class SafeNetworkMonitor:
 
     def _update_device_info(self, host, nm, current_time):
         ip, mac = host, nm[host]['addresses'].get('mac', 'N/A')
+
         if ip in self.devices:
             self.devices[ip].update(mac=mac, last_seen=current_time)
         else:
             self.devices[ip] = {'mac': mac, 'last_seen': current_time }
+
+        # hostname = self._get_device_name(ip)
+        # if ip in self.devices:
+        #     self.devices[ip].update(mac=mac, last_seen=current_time, hostname=hostname)
+        # else:
+        #     self.devices[ip] = {'mac': mac, 'last_seen': current_time, 'hostname': hostname}
+
+    # def _add_current_device(self, current_time):
+    #     my_ip, my_mac = self._get_ip_address(), self._get_mac_address()
+    #     if my_ip:
+    #         hostname = socket.gethostname()  # Get current machine's hostname
+    #         self.devices[my_ip] = self.devices.get(my_ip, {})
+    #         self.devices[my_ip].update(
+    #             mac=my_mac, 
+    #             last_seen=current_time,
+    #             hostname=hostname
+    #         )
 
     def _add_current_device(self, current_time):
         my_ip, my_mac = self._get_ip_address(), self._get_mac_address()
@@ -198,6 +253,14 @@ class SafeNetworkMonitor:
                 node_colors.append('orange')  
         return node_colors
 
+    # def _get_device_name(self, ip):
+    #     try:
+    #         hostname = socket.gethostbyaddr(ip)[0]
+    #         return hostname
+    #     except (socket.herror, socket.gaierror):
+    #         return "Unknown Device"
+
+
 
 # Flask routes
 @app.route("/")
@@ -216,7 +279,9 @@ def get_devices():
         devices_in_subnet = {
             ip: {
                 **info,
-                "monitored": ip in client_statuses  # Indicate if the client is actively updating status
+                "monitored": ip in client_statuses,  # Indicate if the client is actively updating status
+                "data_usage": monitor.get_device_usage(ip)
+                
             }
             for ip, info in monitor.devices.items()
             if subnet and ipaddress.ip_address(ip) in subnet
@@ -447,6 +512,7 @@ async def main():
 
 # Initialize SafeNetworkMonitor
 monitor = SafeNetworkMonitor()
+monitor.start_traffic_monitoring()
 
 if __name__ == "__main__":
     try:
