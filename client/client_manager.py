@@ -1,10 +1,7 @@
 # client_manager.py
 import asyncio
-import os
 import threading
 import logging
-import signal
-import sys
 from typing import Callable, Dict
 from config import (
     SERVER_IP,

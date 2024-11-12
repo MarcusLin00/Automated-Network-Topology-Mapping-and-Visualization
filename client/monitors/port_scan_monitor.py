@@ -8,7 +8,8 @@ from datetime import datetime
 from scapy.all import conf, sniff, IP, TCP, AsyncSniffer
 from typing import Callable
 from .base_monitor import BaseMonitor
-
+import gc
+gc.collect()
 
 # Clear scapy sessions
 conf.sessions = {}
@@ -96,7 +97,7 @@ class PortScanMonitor(BaseMonitor):
 
     def start(self):
         logging.info("Starting PortScanMonitor...")
-        self.sniffer = AsyncSniffer(filter="tcp", prn=self.detect, store=0)
+        self.sniffer = AsyncSniffer(filter="tcp[tcpflags] & tcp-syn != 0", prn=self.detect, store=0)
         self.sniffer.start()
 
     def stop(self):
