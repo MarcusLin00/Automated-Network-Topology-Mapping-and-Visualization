@@ -17,9 +17,7 @@ from config import (
     MONITORED_PATHS,
 )
 from networking import send_status, send_alert
-from monitors import PortScanMonitor, DLPMonitor, DeviceHealthMonitor, MalwarePhishingMonitor
-
-
+from monitors import PortScanMonitor, DLPMonitor, DeviceHealthMonitor, MalwarePhishingMonitor, DataUsageMonitor
 
 class ClientManager:
     """Manager to handle all client functions, including status updates and alerts."""
@@ -37,6 +35,7 @@ class ClientManager:
         cpu_threshold: int = 90,  
         mem_threshold: int = 80, 
         check_interval: int = 5,
+        threshold: int = 100   #data usage threshold
         
     ):
         # Network settings
@@ -62,6 +61,7 @@ class ClientManager:
         self.mem_threshold = mem_threshold
         self.check_interval = check_interval
         self.monitored_paths = monitored_paths
+        self.threshold = threshold
 
     def send_status_updates(self):
         """Start the status update sender."""
@@ -168,6 +168,15 @@ class ClientManager:
             cooldown=self.cooldown
         )
         self.register_module("MalwarePhishinMonitor", malware_phishing_monitor)
+
+        # Initialize Data Usage Monitor
+        data_usage_monitor = DataUsageMonitor(
+            alert_callback=self.send_alert_async,
+            loop=self.loop,
+            threshold=self.threshold,
+            cooldown=self.cooldown
+        )
+        self.register_module("DataUsageMonitor", data_usage_monitor)
 
         # Start all registered modules
         self.start_all_modules()
