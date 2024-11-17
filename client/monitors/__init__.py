@@ -4,5 +4,6 @@ from .port_scan_monitor import PortScanMonitor
 from .dlp_monitor import DLPMonitor
 from .device_health_monitor import DeviceHealthMonitor
 from .malware_phishing_monitor import MalwarePhishingMonitor
+from .dataUsage_monitor import DataUsageMonitor
 
-__all__ = ["BaseMonitor", "PortScanMonitor", "DLPMonitor", "DeviceHealthMonitor", "MalwarePhishingMonitor"]
+__all__ = ["BaseMonitor", "PortScanMonitor", "DLPMonitor", "DeviceHealthMonitor", "MalwarePhishingMonitor", "DataUsageMonitor"]
